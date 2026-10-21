@@ -80,7 +80,7 @@ export function drawCaptions(
   ctx.font = `${style.italic ? "italic " : ""}${style.weight} ${size}px "${style.font}"`;
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
-  const space = ctx.measureText(" ").width;
+  const space = ctx.measureText(" ").width * 1.25;
   const maxW = w * 0.84;
   const tokens = chunk.words.map((wd) => ({ wd, s: style.upper ? wd.text.toUpperCase() : wd.text }));
   const lines: { items: typeof tokens; width: number }[] = [];
@@ -129,7 +129,7 @@ export function drawCaptions(
         ctx.shadowBlur = size * 0.35;
         ctx.shadowOffsetY = size * 0.06;
       }
-      const scaleW = isActive && !style.box && style.active !== style.fill ? 1.08 : 1;
+      const scaleW = isActive && !style.box && style.active !== style.fill ? 1.04 : 1;
       ctx.translate(x + tw / 2, y);
       ctx.scale(scaleW, scaleW);
       if (style.stroke && !(style.box && isActive)) {
