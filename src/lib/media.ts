@@ -1,3 +1,13 @@
+import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  Conversion,
+  Input,
+  Mp4OutputFormat,
+  Output,
+  QUALITY_VERY_HIGH,
+} from "mediabunny";
 import { drawCaptions, type CaptionStyle, type Chunk } from "./captions";
 
 const RATE = 16000;
@@ -39,7 +49,76 @@ export async function extractWavBase64(file: File): Promise<{ base64: string; du
   return { base64: btoa(bin), duration: decoded.duration };
 }
 
+/**
+ * Renders the captioned video frame by frame (not in real time), so no frames
+ * are dropped and the output never stutters. Falls back to real-time capture
+ * only when the browser lacks WebCodecs support.
+ */
 export async function renderVideo(
+  file: File,
+  url: string,
+  chunks: Chunk[],
+  style: CaptionStyle,
+  opts: { posY: number; scale: number },
+  onProgress: (p: number) => void,
+): Promise<{ blob: Blob; ext: string }> {
+  if (typeof VideoEncoder !== "undefined") {
+    try {
+      return await renderPrecise(file, chunks, style, opts, onProgress);
+    } catch (e) {
+      console.warn("Renderização precisa falhou, usando captura em tempo real:", e);
+    }
+  }
+  return renderRealtime(url, chunks, style, opts, onProgress);
+}
+
+async function renderPrecise(
+  file: File,
+  chunks: Chunk[],
+  style: CaptionStyle,
+  opts: { posY: number; scale: number },
+  onProgress: (p: number) => void,
+): Promise<{ blob: Blob; ext: string }> {
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  const target = new BufferTarget();
+  const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+
+  const conversion = await Conversion.init({
+    input,
+    output,
+    video: {
+      quality: QUALITY_VERY_HIGH,
+      allowTransformationMetadata: false,
+      process: (sample) => {
+        const w = sample.displayWidth;
+        const h = sample.displayHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        sample.draw(ctx, 0, 0, w, h);
+        drawCaptions(ctx, w, h, chunks, sample.timestamp, style, opts);
+        return canvas;
+      },
+    },
+    showWarnings: false,
+  });
+
+  if (!conversion.isValid) throw new Error("Não foi possível converter este vídeo.");
+
+  conversion.onProgress = (p) => onProgress(p);
+  await conversion.execute();
+
+  const buffer = target.buffer;
+  if (!buffer) throw new Error("Falha ao finalizar o vídeo.");
+  onProgress(1);
+  return { blob: new Blob([buffer], { type: "video/mp4" }), ext: "mp4" };
+}
+
+async function renderRealtime(
   url: string,
   chunks: Chunk[],
   style: CaptionStyle,
