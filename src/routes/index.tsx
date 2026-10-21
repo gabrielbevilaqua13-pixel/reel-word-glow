@@ -73,7 +73,7 @@ function Index() {
     setExporting(0);
     try {
       await loadCaptionFonts();
-      const { blob, ext } = await renderVideo(url, chunks, style, { posY, scale }, setExporting);
+      const { blob, ext } = await renderVideo(file!, url, chunks, style, { posY, scale }, setExporting);
       download(blob, `${(file?.name ?? "reel").replace(/\.[^.]+$/, "")}-legendado.${ext}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao exportar.");
