@@ -148,13 +148,13 @@ function Index() {
 
             <div className="grid gap-6 sm:grid-cols-3">
               <Control label="Palavras por vez" value={String(maxWords)}>
-                <Slider min={1} max={6} step={1} value={[maxWords]} onValueChange={([v]) => setMaxWords(v)} />
+                <Slider min={1} max={6} step={1} value={[maxWords]} onValueChange={(v) => setMaxWords(v[0] ?? 3)} />
               </Control>
               <Control label="Posição" value={`${Math.round(posY * 100)}%`}>
-                <Slider min={0.15} max={0.88} step={0.01} value={[posY]} onValueChange={([v]) => setPosY(v)} />
+                <Slider min={0.15} max={0.88} step={0.01} value={[posY]} onValueChange={(v) => setPosY(v[0] ?? 0.68)} />
               </Control>
               <Control label="Tamanho" value={`${Math.round(scale * 100)}%`}>
-                <Slider min={0.6} max={1.6} step={0.05} value={[scale]} onValueChange={([v]) => setScale(v)} />
+                <Slider min={0.6} max={1.6} step={0.05} value={[scale]} onValueChange={(v) => setScale(v[0] ?? 1)} />
               </Control>
             </div>
 
