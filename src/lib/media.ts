@@ -30,7 +30,7 @@ export async function extractWavBase64(file: File): Promise<{ base64: string; du
   ws(36, "data");
   out.setUint32(40, pcm.length * 2, true);
   for (let i = 0; i < pcm.length; i++) {
-    const s = Math.max(-1, Math.min(1, pcm[i]));
+    const s = Math.max(-1, Math.min(1, pcm[i]!));
     out.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   const bytes = new Uint8Array(out.buffer);
@@ -89,5 +89,5 @@ export async function renderVideo(
   await done;
   await ac.close();
   onProgress(1);
-  return { blob: new Blob(parts, { type: mime.split(";")[0] }), ext: mime.startsWith("video/mp4") ? "mp4" : "webm" };
+  return { blob: new Blob(parts, { type: mime.split(";")[0] ?? mime }), ext: mime.startsWith("video/mp4") ? "mp4" : "webm" };
 }

@@ -7,7 +7,7 @@ export function groupWords(words: Word[], maxWords: number): Chunk[] {
   let cur: Word[] = [];
   const flush = () => {
     if (!cur.length) return;
-    chunks.push({ id: `${cur[0].start}-${chunks.length}`, words: cur, start: cur[0].start, end: cur[cur.length - 1].end });
+    chunks.push({ id: `${cur[0]!.start}-${chunks.length}`, words: cur, start: cur[0]!.start, end: cur[cur.length - 1]!.end });
     cur = [];
   };
   words.forEach((w, i) => {
@@ -20,7 +20,8 @@ export function groupWords(words: Word[], maxWords: number): Chunk[] {
   // hold each chunk on screen until the next begins (max 0.5s extra)
   for (let i = 0; i < chunks.length; i++) {
     const next = chunks[i + 1];
-    chunks[i].end = next ? Math.min(next.start, chunks[i].end + 0.5) : chunks[i].end + 0.5;
+    const c = chunks[i]!;
+    c.end = next ? Math.min(next.start, c.end + 0.5) : c.end + 0.5;
   }
   return chunks;
 }
@@ -29,9 +30,9 @@ export function groupWords(words: Word[], maxWords: number): Chunk[] {
 export function retextChunk(chunk: Chunk, text: string): Word[] {
   const tokens = text.split(/\s+/).filter(Boolean);
   if (!tokens.length) return [];
-  if (tokens.length === chunk.words.length) return chunk.words.map((w, i) => ({ ...w, text: tokens[i] }));
-  const s = chunk.words[0].start;
-  const e = chunk.words[chunk.words.length - 1].end;
+  if (tokens.length === chunk.words.length) return chunk.words.map((w, i) => ({ ...w, text: tokens[i]! }));
+  const s = chunk.words[0]!.start;
+  const e = chunk.words[chunk.words.length - 1]!.end;
   const step = (e - s) / tokens.length;
   return tokens.map((t, i) => ({ text: t, start: s + i * step, end: s + (i + 1) * step }));
 }

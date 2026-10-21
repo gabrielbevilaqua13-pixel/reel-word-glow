@@ -33,14 +33,14 @@ function Index() {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
   const [words, setWords] = useState<Word[]>([]);
-  const [styleId, setStyleId] = useState(STYLES[0].id);
+  const [styleId, setStyleId] = useState("impacto");
   const [maxWords, setMaxWords] = useState(3);
   const [posY, setPosY] = useState(0.68);
   const [scale, setScale] = useState(1);
   const [exporting, setExporting] = useState<number | null>(null);
   const [now, setNow] = useState(0);
 
-  const style = STYLES.find((s) => s.id === styleId)!;
+  const style = STYLES.find((s) => s.id === styleId) ?? STYLES[0]!;
   const chunks = useMemo(() => groupWords(words, maxWords), [words, maxWords]);
 
   const handleFile = async (f: File) => {
@@ -84,6 +84,7 @@ function Index() {
 
   const editChunk = (idx: number, text: string) => {
     const c = chunks[idx];
+    if (!c?.words[0]) return;
     const first = words.indexOf(c.words[0]);
     const next = [...words];
     next.splice(first, c.words.length, ...retextChunk(c, text));
