@@ -12,7 +12,13 @@ import { drawCaptions, type CaptionStyle, type Chunk } from "./captions";
 
 const RATE = 16000;
 
-export async function extractWavBase64(file: File): Promise<{ base64: string; duration: number }> {
+export type AudioSegment = { base64: string; offset: number; duration: number };
+
+/**
+ * Splits the audio into ~20s segments cut at the quietest moment, so the
+ * transcription model aligns each short piece precisely (long audio drifts).
+ */
+export async function extractWavSegments(file: File, target = 20): Promise<{ segments: AudioSegment[]; duration: number }> {
   const buf = await file.arrayBuffer();
   const ac = new AudioContext();
   const decoded = await ac.decodeAudioData(buf);
@@ -22,8 +28,29 @@ export async function extractWavBase64(file: File): Promise<{ base64: string; du
   src.buffer = decoded;
   src.connect(off.destination);
   src.start();
-  const rendered = await off.startRendering();
-  const pcm = rendered.getChannelData(0);
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const cuts = [0];
+  const win = RATE / 50; // 20ms energy windows
+  while (pcm.length - cuts[cuts.length - 1]! > (target + 6) * RATE) {
+    const base = cuts[cuts.length - 1]! + target * RATE;
+    let best = base, bestE = Infinity;
+    for (let p = base - 4 * RATE; p < base + 4 * RATE; p += win) {
+      let e = 0;
+      for (let i = p; i < p + win; i++) e += pcm[i]! * pcm[i]!;
+      if (e < bestE) (bestE = e), (best = p + win / 2);
+    }
+    cuts.push(Math.round(best));
+  }
+  cuts.push(pcm.length);
+  const segments: AudioSegment[] = [];
+  for (let k = 0; k < cuts.length - 1; k++) {
+    const slice = pcm.subarray(cuts[k]!, cuts[k + 1]!);
+    segments.push({ base64: encodeWav(slice), offset: cuts[k]! / RATE, duration: slice.length / RATE });
+  }
+  return { segments, duration: decoded.duration };
+}
+
+function encodeWav(pcm: Float32Array): string {
   const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
   const ws = (o: number, s: string) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
   ws(0, "RIFF");
@@ -46,7 +73,7 @@ export async function extractWavBase64(file: File): Promise<{ base64: string; du
   const bytes = new Uint8Array(out.buffer);
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { base64: btoa(bin), duration: decoded.duration };
+  return btoa(bin);
 }
 
 /**

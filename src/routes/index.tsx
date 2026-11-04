@@ -7,7 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { transcribeAudio, type Word } from "@/lib/transcribe.functions";
 import { STYLES, drawCaptions, groupWords, loadCaptionFonts, retextChunk, toSrt } from "@/lib/captions";
-import { extractWavBase64, renderVideo } from "@/lib/media";
+import { extractWavSegments, renderVideo } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -51,11 +51,26 @@ function Index() {
     setPhase("transcribing");
     setError("");
     try {
-      const { base64, duration } = await extractWavBase64(f);
+      const { segments, duration } = await extractWavSegments(f);
       if (duration > 600) throw new Error("Vídeos de até 10 minutos.");
-      const res = await transcribe({ data: { audioBase64: base64, duration } });
-      if ("error" in res) throw new Error(res.error);
-      setWords(res.words);
+      const all: Word[][] = new Array(segments.length);
+      let next = 0;
+      const worker = async () => {
+        while (next < segments.length) {
+          const k = next++;
+          const seg = segments[k]!;
+          const res = await transcribe({ data: { audioBase64: seg.base64, duration: seg.duration } });
+          if ("error" in res) {
+            if (res.error.startsWith("Não encontramos fala")) { all[k] = []; continue; }
+            throw new Error(res.error);
+          }
+          all[k] = res.words.map((w) => ({ ...w, start: w.start + seg.offset, end: w.end + seg.offset }));
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, segments.length) }, worker));
+      const merged = all.flat();
+      if (!merged.length) throw new Error("Não encontramos fala neste vídeo.");
+      setWords(merged);
       setPhase("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Algo deu errado.");
