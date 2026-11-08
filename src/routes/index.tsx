@@ -140,7 +140,7 @@ function Index() {
           <section className="space-y-8">
             <div>
               <Label>Estilo</Label>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {STYLES.map((s) => (
                   <button
                     key={s.id}
