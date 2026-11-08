@@ -52,17 +52,37 @@ export type CaptionStyle = {
   dimInactive?: boolean;
   shadow?: boolean;
   sizeFactor: number;
+  /** Words appear one by one as spoken (fade + rise); key word in italic accent color. */
+  reveal?: boolean;
+  accent?: string;
 };
+
+/** Picks the most meaningful word of a chunk (longest, 5+ letters) to emphasize. */
+function keyWordIndex(words: Word[]): number {
+  let best = -1, bestLen = 4;
+  words.forEach((w, i) => {
+    const len = w.text.replace(/[^\p{L}]/gu, "").length;
+    if (len > bestLen) (best = i), (bestLen = len);
+  });
+  return words.length >= 3 ? best : -1;
+}
 
 export const STYLES: CaptionStyle[] = [
   { id: "impacto", name: "Impacto", font: "Montserrat", weight: 900, upper: true, fill: "#ffffff", active: "#e4ff3a", stroke: "#000000", sizeFactor: 1 },
   { id: "caixa", name: "Caixa", font: "Montserrat", weight: 800, upper: false, fill: "#ffffff", active: "#ffffff", box: "#ff4d2e", stroke: "#000000", sizeFactor: 0.92 },
   { id: "elegante", name: "Elegante", font: "DM Serif Display", weight: 400, italic: true, upper: false, fill: "#ffffff", active: "#ffffff", dimInactive: true, shadow: true, sizeFactor: 1.05 },
+  { id: "editorial", name: "Editorial", font: "Cormorant Garamond", weight: 500, upper: false, fill: "#ffffff", active: "#ffffff", shadow: true, reveal: true, accent: "#e9c98f", sizeFactor: 1.15 },
   { id: "cinema", name: "Cinema", font: "Anton", weight: 400, upper: true, fill: "#ffd60a", active: "#ffd60a", stroke: "#000000", sizeFactor: 1.1 },
 ];
 
 export async function loadCaptionFonts() {
-  await Promise.all(STYLES.map((s) => document.fonts.load(`${s.italic ? "italic " : ""}${s.weight} 40px "${s.font}"`)));
+  await Promise.all(
+    STYLES.flatMap((s) => {
+      const l = [document.fonts.load(`${s.italic ? "italic " : ""}${s.weight} 40px "${s.font}"`)];
+      if (s.accent) l.push(document.fonts.load(`italic ${s.weight} 40px "${s.font}"`));
+      return l;
+    }),
+  );
 }
 
 export function drawCaptions(
@@ -108,6 +128,9 @@ export function drawCaptions(
   ctx.scale(0.88 + 0.12 * ease, 0.88 + 0.12 * ease);
   ctx.globalAlpha = ease;
   const top = -((lines.length - 1) * lineH) / 2;
+  const baseFont = ctx.font;
+  const accentFont = `italic ${style.weight} ${size}px "${style.font}"`;
+  const key = style.accent ? chunk.words[keyWordIndex(chunk.words)] : undefined;
   lines.forEach((ln, li) => {
     let x = -ln.width / 2;
     const y = top + li * lineH;
@@ -115,6 +138,25 @@ export function drawCaptions(
       const tw = ctx.measureText(tk.s).width;
       const isActive = t >= tk.wd.start && t < tk.wd.end + 0.02;
       const spoken = t >= tk.wd.start;
+      if (style.reveal) {
+        const p = Math.max(0, Math.min(1, (t - tk.wd.start + 0.05) / 0.28));
+        if (p > 0) {
+          const e = 1 - Math.pow(1 - p, 3);
+          ctx.save();
+          ctx.globalAlpha *= e;
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = size * 0.4;
+          ctx.shadowOffsetY = size * 0.04;
+          const isKey = tk.wd === key;
+          ctx.font = isKey ? accentFont : baseFont;
+          ctx.fillStyle = isKey ? style.accent! : style.fill;
+          const kw = ctx.measureText(tk.s).width;
+          ctx.fillText(tk.s, x + (tw - kw) / 2, y + size * 0.18 * (1 - e));
+          ctx.restore();
+        }
+        x += tw + space;
+        continue;
+      }
       ctx.save();
       if (style.box && isActive) {
         const px = size * 0.18;
