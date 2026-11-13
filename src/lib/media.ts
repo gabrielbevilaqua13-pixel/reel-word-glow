@@ -1,5 +1,6 @@
 import {
   ALL_FORMATS,
+  AudioBufferSink,
   BlobSource,
   BufferTarget,
   Conversion,
@@ -9,45 +10,41 @@ import {
   QUALITY_VERY_HIGH,
 } from "mediabunny";
 import { drawCaptions, type CaptionStyle, type Chunk } from "./captions";
+import { segmentWindows, type SegmentWindow } from "./timing";
 
 const RATE = 16000;
 
-export type AudioSegment = { base64: string; offset: number; duration: number };
+export type AudioSegment = SegmentWindow & { base64: string };
 
 /**
- * Splits the audio into ~20s segments cut at the quietest moment, so the
- * transcription model aligns each short piece precisely (long audio drifts).
+ * Decode on the media timeline (including track offsets and gaps), then use
+ * short windows with context on both sides of each ownership boundary.
  */
-export async function extractWavSegments(file: File, target = 20): Promise<{ segments: AudioSegment[]; duration: number }> {
-  const buf = await file.arrayBuffer();
-  const ac = new AudioContext();
-  const decoded = await ac.decodeAudioData(buf);
-  await ac.close();
-  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * RATE), RATE);
-  const src = off.createBufferSource();
-  src.buffer = decoded;
-  src.connect(off.destination);
-  src.start();
-  const pcm = (await off.startRendering()).getChannelData(0);
-  const cuts = [0];
-  const win = RATE / 50; // 20ms energy windows
-  while (pcm.length - cuts[cuts.length - 1]! > (target + 6) * RATE) {
-    const base = cuts[cuts.length - 1]! + target * RATE;
-    let best = base, bestE = Infinity;
-    for (let p = base - 4 * RATE; p < base + 4 * RATE; p += win) {
-      let e = 0;
-      for (let i = p; i < p + win; i++) e += pcm[i]! * pcm[i]!;
-      if (e < bestE) (bestE = e), (best = p + win / 2);
+export async function extractWavSegments(file: File, target = 8): Promise<{ segments: AudioSegment[]; duration: number }> {
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  try {
+    const duration = await input.computeDuration();
+    if (duration > 600) throw new Error("Vídeos de até 10 minutos.");
+    if (!Number.isFinite(duration) || duration <= 0) throw new Error("Não foi possível ler a duração do vídeo.");
+    const track = await input.getPrimaryAudioTrack();
+    if (!track) throw new Error("Não encontramos áudio neste vídeo.");
+    const off = new OfflineAudioContext(1, Math.ceil(duration * RATE), RATE);
+    for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers()) {
+      if (timestamp + buffer.duration <= 0 || timestamp >= duration) continue;
+      const src = off.createBufferSource();
+      src.buffer = buffer;
+      src.connect(off.destination);
+      src.start(Math.max(0, timestamp), Math.max(0, -timestamp));
     }
-    cuts.push(Math.round(best));
+    const pcm = (await off.startRendering()).getChannelData(0);
+    const segments = segmentWindows(pcm, RATE, target).map((window) => ({
+      ...window,
+      base64: encodeWav(pcm.subarray(Math.round(window.offset * RATE), Math.round((window.offset + window.duration) * RATE))),
+    }));
+    return { segments, duration };
+  } finally {
+    input.dispose();
   }
-  cuts.push(pcm.length);
-  const segments: AudioSegment[] = [];
-  for (let k = 0; k < cuts.length - 1; k++) {
-    const slice = pcm.subarray(cuts[k]!, cuts[k + 1]!);
-    segments.push({ base64: encodeWav(slice), offset: cuts[k]! / RATE, duration: slice.length / RATE });
-  }
-  return { segments, duration: decoded.duration };
 }
 
 function encodeWav(pcm: Float32Array): string {

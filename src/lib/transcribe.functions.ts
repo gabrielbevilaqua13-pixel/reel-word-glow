@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { normalizeWords } from "./timing";
 
 export type Word = { text: string; start: number; end: number };
 
@@ -31,81 +32,47 @@ export const transcribeAudio = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }): Promise<{ words: Word[] } | { error: string }> => {
-    const key = process.env["LOVABLE_API_KEY"];
-    if (!key) return { error: "Serviço de transcrição não configurado." };
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
+    const { streamChatCompletion, GatewayError } = await import("@lovable.dev/ai-gateway");
+    try {
+      const stream = await streamChatCompletion({
         model: "google/gemini-3.8-flash",
-        stream: true,
         response_format: { type: "json_schema", json_schema: { name: "words", strict: true, schema } },
         messages: [
           {
             role: "system",
             content:
-              "You are a precise forced-alignment transcription engine for short-form video captions. Transcribe every spoken word verbatim in the original language (keep accents and correct spelling, add natural punctuation attached to words). For each word return start and end time in seconds with 2-decimal precision, aligned exactly to when the word is spoken in the audio. Times must be monotonic and within the audio duration. Return JSON only.",
+              "Transcribe the actual audible speech verbatim in its original language, one word per item. Listen to the entire clip, then verify each word's onset and offset against the audio. Return seconds relative to the very beginning of this clip (including any leading silence), with 3-decimal precision. Preserve pauses: never distribute words evenly, estimate timestamps from reading speed, or stretch timings to fill the clip. Include audible words near both edges; overlapping context will be merged separately. No invented speech, music lyrics unless clearly audible, or timestamps beyond the clip. Each end must exceed start; words must be chronological and non-overlapping. Return an empty words array for no speech. Return JSON only.",
           },
           {
             role: "user",
             content: [
-              { type: "text", text: `Audio duration: ${data.duration.toFixed(2)} seconds. Return the word-level timestamps.` },
+              { type: "text", text: `Clip duration: ${data.duration.toFixed(3)} seconds. Time zero is the first audio sample, not the first spoken word. Return exact word-level timestamps after checking the beginning, middle and end against what you hear.` },
               { type: "input_audio", input_audio: { data: data.audioBase64, format: "wav" } },
             ],
           },
         ],
-      }),
-    });
-
-    if (!res.ok || !res.body) {
-      const t = await res.text().catch(() => "");
-      if (res.status === 429) return { error: "Muitas solicitações. Aguarde um pouco e tente de novo." };
-      if (res.status === 402) return { error: "Créditos de IA esgotados no workspace." };
-      return { error: `Falha na transcrição (${res.status}). ${t.slice(0, 200)}` };
-    }
-
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    let out = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        const l = line.trim();
-        if (!l.startsWith("data:")) continue;
-        const payload = l.slice(5).trim();
-        if (payload === "[DONE]") continue;
-        try {
-          const j = JSON.parse(payload);
-          out += j.choices?.[0]?.delta?.content ?? "";
-        } catch {
-          /* partial */
+      });
+      let out = "";
+      for await (const event of stream) {
+        const choice = event.choices?.[0];
+        if (choice?.finish_reason && choice.finish_reason !== "stop") {
+          return { error: "A resposta da transcrição veio incompleta. Tente novamente." };
         }
+        out += choice?.delta?.content ?? "";
       }
-    }
-
-    try {
-      const parsed = JSON.parse(out) as { words: Word[] };
-      const words = parsed.words
-        .filter((w) => w.text.trim())
-        .map((w) => ({
-          text: w.text.trim(),
-          start: Math.max(0, Math.min(w.start, data.duration)),
-          end: Math.max(0, Math.min(Math.max(w.end, w.start + 0.05), data.duration)),
-        }))
-        .sort((a, b) => a.start - b.start);
+      const parsed = z.object({ words: z.array(z.object({
+        text: z.string(), start: z.number().finite(), end: z.number().finite(),
+      })) }).parse(JSON.parse(out));
+      const words = normalizeWords(parsed.words, data.duration);
       if (!words.length) return { error: "Não encontramos fala neste vídeo." };
       return { words };
-    } catch {
+    } catch (error) {
+      if (error instanceof GatewayError) {
+        console.error("Transcription gateway failure", error.code, error.ids);
+        if (error.httpStatus === 429) return { error: "Muitas solicitações. Aguarde um pouco e tente de novo." };
+        if (error.httpStatus === 402) return { error: "Créditos de IA esgotados no workspace." };
+        return { error: "Não foi possível concluir a transcrição. Tente novamente mais tarde." };
+      }
       return { error: "A resposta da transcrição veio incompleta. Tente novamente." };
     }
   });

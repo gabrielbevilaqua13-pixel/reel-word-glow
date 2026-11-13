@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { transcribeAudio, type Word } from "@/lib/transcribe.functions";
 import { STYLES, drawCaptions, groupWords, loadCaptionFonts, retextChunk, toSrt } from "@/lib/captions";
 import { extractWavSegments, renderVideo } from "@/lib/media";
+import { mergeSegments } from "@/lib/timing";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -58,17 +59,18 @@ function Index() {
       const worker = async () => {
         while (next < segments.length) {
           const k = next++;
-          const seg = segments[k]!;
+           const seg = segments[k];
+           if (!seg) continue;
           const res = await transcribe({ data: { audioBase64: seg.base64, duration: seg.duration } });
           if ("error" in res) {
             if (res.error.startsWith("Não encontramos fala")) { all[k] = []; continue; }
             throw new Error(res.error);
           }
-          all[k] = res.words.map((w) => ({ ...w, start: w.start + seg.offset, end: w.end + seg.offset }));
+           all[k] = res.words;
         }
       };
       await Promise.all(Array.from({ length: Math.min(4, segments.length) }, worker));
-      const merged = all.flat();
+       const merged = mergeSegments(all, segments, duration);
       if (!merged.length) throw new Error("Não encontramos fala neste vídeo.");
       setWords(merged);
       setPhase("ready");
@@ -288,6 +290,14 @@ function Preview({
 
   useEffect(() => {
     let raf = 0;
+    let frame = 0;
+    let presentedTime: number | null = null;
+    const video = videoRef.current;
+    const trackFrame = (_: number, metadata: VideoFrameCallbackMetadata) => {
+      presentedTime = metadata.mediaTime;
+      if (video) frame = video.requestVideoFrameCallback(trackFrame);
+    };
+    if (video && typeof video.requestVideoFrameCallback === "function") frame = video.requestVideoFrameCallback(trackFrame);
     let last = -1;
     loadCaptionFonts();
     const tick = () => {
@@ -298,19 +308,24 @@ function Preview({
           c.width = v.videoWidth;
           c.height = v.videoHeight;
         }
-        const ctx = c.getContext("2d")!;
+         const ctx = c.getContext("2d");
+         if (!ctx) return;
         ctx.clearRect(0, 0, c.width, c.height);
         const s = state.current;
-        drawCaptions(ctx, c.width, c.height, s.chunks, v.currentTime, s.style, { posY: s.posY, scale: s.scale });
-        if (Math.abs(v.currentTime - last) > 0.1) {
-          last = v.currentTime;
-          onTime(v.currentTime);
+         const time = v.paused || v.seeking ? v.currentTime : (presentedTime ?? v.currentTime);
+         drawCaptions(ctx, c.width, c.height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
+         if (Math.abs(time - last) > 0.1) {
+           last = time;
+           onTime(time);
         }
       }
       raf = requestAnimationFrame(tick);
     };
     tick();
-    return () => cancelAnimationFrame(raf);
+     return () => {
+       cancelAnimationFrame(raf);
+       if (video && frame) video.cancelVideoFrameCallback(frame);
+     };
   }, [onTime]);
 
   return (

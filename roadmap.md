@@ -1,0 +1,3 @@
+- [x] Preserve audio presentation timestamps and add shorter, overlapping transcription segments.
+- [x] Validate word timings and synchronize preview to presented video frames.
+- [x] Run timing regressions and verify an actual upload/export flow.

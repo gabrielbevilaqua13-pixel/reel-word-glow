@@ -6,8 +6,10 @@ export function groupWords(words: Word[], maxWords: number): Chunk[] {
   const chunks: Chunk[] = [];
   let cur: Word[] = [];
   const flush = () => {
-    if (!cur.length) return;
-    chunks.push({ id: `${cur[0]!.start}-${chunks.length}`, words: cur, start: cur[0]!.start, end: cur[cur.length - 1]!.end });
+    const first = cur[0];
+    const last = cur.at(-1);
+    if (!first || !last) return;
+    chunks.push({ id: `${first.start}-${chunks.length}`, words: cur, start: first.start, end: Math.max(...cur.map((w) => w.end)) });
     cur = [];
   };
   words.forEach((w, i) => {
@@ -20,7 +22,8 @@ export function groupWords(words: Word[], maxWords: number): Chunk[] {
   // hold each chunk on screen until the next begins (max 0.5s extra)
   for (let i = 0; i < chunks.length; i++) {
     const next = chunks[i + 1];
-    const c = chunks[i]!;
+    const c = chunks[i];
+    if (!c) continue;
     c.end = next ? Math.min(next.start, c.end + 0.5) : c.end + 0.5;
   }
   return chunks;
@@ -136,10 +139,10 @@ export function drawCaptions(
     const y = top + li * lineH;
     for (const tk of ln.items) {
       const tw = ctx.measureText(tk.s).width;
-      const isActive = t >= tk.wd.start && t < tk.wd.end + 0.02;
+      const isActive = t >= tk.wd.start && t < tk.wd.end;
       const spoken = t >= tk.wd.start;
       if (style.reveal) {
-        const p = Math.max(0, Math.min(1, (t - tk.wd.start + 0.05) / 0.28));
+        const p = Math.max(0, Math.min(1, (t - tk.wd.start) / 0.12));
         if (p > 0) {
           const e = 1 - Math.pow(1 - p, 3);
           ctx.save();
