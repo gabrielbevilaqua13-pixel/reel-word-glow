@@ -84,7 +84,9 @@ function Index() {
            all[k] = res.words;
         }
       };
-      await Promise.all(Array.from({ length: Math.min(4, segments.length) }, worker));
+      // Process one segment at a time to avoid simultaneous server actions and
+      // large overlapping audio payloads on memory-constrained browsers/instances.
+      await worker();
        const merged = mergeSegments(all, segments, duration);
       if (!merged.length) throw new Error("Não encontramos fala neste vídeo.");
       setWords(merged);
