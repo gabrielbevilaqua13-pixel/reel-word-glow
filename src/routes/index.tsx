@@ -52,7 +52,7 @@ function Index() {
   }, [url]);
 
   const baseStyle = STYLES.find((s) => s.id === styleId) ?? STYLES[0]!;
-  const style = useMemo(() => ({ ...baseStyle, fill: textColor, active: highlightColor, accent: baseStyle.accent ? highlightColor : baseStyle.accent, box: showHighlightBox ? boxColor : baseStyle.box, boxText: textColor }), [baseStyle, textColor, highlightColor, boxColor, showHighlightBox]);
+  const style = useMemo(() => ({ ...baseStyle, fill: textColor, active: highlightColor, accent: baseStyle.accent ? highlightColor : baseStyle.accent, box: showHighlightBox ? boxColor : undefined, boxText: textColor }), [baseStyle, textColor, highlightColor, boxColor, showHighlightBox]);
   useEffect(() => {
     setTextColor(baseStyle.fill);
     setHighlightColor(baseStyle.accent ?? baseStyle.active);
