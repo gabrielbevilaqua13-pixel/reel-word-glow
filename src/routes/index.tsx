@@ -299,7 +299,7 @@ function Index() {
               <p className="mb-4 text-xs text-muted-foreground">Clique em qualquer linha para corrigir o texto. As marcações de tempo serão preservadas.</p>
               <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
                 {chunks.map((c, i) => (
-                  <div key={c.id + c.words.map((w) => w.text).join()} className={cn("flex items-center gap-3 rounded-xl border px-3 py-3 transition", now >= c.start && now < c.end ? "border-primary/35 bg-primary/[0.07]" : "border-white/[0.045] bg-black/10 hover:border-white/10")}>
+                  <div key={c.id + c.words.map((w) => w.text).join()} className="flex items-center gap-3 rounded-xl border border-white/[0.045] bg-black/10 px-3 py-3 transition hover:border-white/10">
                     <span className="w-12 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{c.start.toFixed(1)}s</span>
                     <input defaultValue={c.words.map((w) => w.text).join(" ")} onBlur={(e) => e.target.value !== c.words.map((w) => w.text).join(" ") && editChunk(i, e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground focus:text-primary" />
                     <span className="text-[10px] text-muted-foreground/50">↵</span>
