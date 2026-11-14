@@ -425,43 +425,77 @@ function Preview({
   state.current = { chunks, style, posY, scale };
 
   useEffect(() => {
-    let raf = 0;
-    let frame = 0;
-    let presentedTime: number | null = null;
     const video = videoRef.current;
-    const trackFrame = (_: number, metadata: VideoFrameCallbackMetadata) => {
-      presentedTime = metadata.mediaTime;
-      if (video) frame = video.requestVideoFrameCallback(trackFrame);
-    };
-    if (video && typeof video.requestVideoFrameCallback === "function") frame = video.requestVideoFrameCallback(trackFrame);
-    let last = -1;
-    loadCaptionFonts();
-    const tick = () => {
-      const v = videoRef.current;
-      const c = canvasRef.current;
-      if (v && c && v.videoWidth) {
-        if (c.width !== v.videoWidth) {
-          c.width = v.videoWidth;
-          c.height = v.videoHeight;
-        }
-         const ctx = c.getContext("2d");
-         if (!ctx) return;
-        ctx.clearRect(0, 0, c.width, c.height);
-        const s = state.current;
-         const time = v.paused || v.seeking ? v.currentTime : (presentedTime ?? v.currentTime);
-         drawCaptions(ctx, c.width, c.height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
-         if (Math.abs(time - last) > 0.1) {
-           last = time;
-           onTime(time);
-        }
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    let raf = 0;
+    let videoFrame = 0;
+    let lastFallbackDraw = 0;
+    let lastReportedTime = -1;
+    let disposed = false;
+
+    const drawFrame = (time: number) => {
+      if (disposed || !video.videoWidth) return;
+      // Keep the preview canvas lightweight even when the source is 4K.
+      const maxDimension = 720;
+      const ratio = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
+      const width = Math.max(1, Math.round(video.videoWidth * ratio));
+      const height = Math.max(1, Math.round(video.videoHeight * ratio));
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
       }
-      raf = requestAnimationFrame(tick);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, width, height);
+      const s = state.current;
+      drawCaptions(ctx, width, height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
+
+      if (Math.abs(time - lastReportedTime) > 0.1) {
+        lastReportedTime = time;
+        onTime(time);
+      }
     };
-    tick();
-     return () => {
-       cancelAnimationFrame(raf);
-       if (video && frame) video.cancelVideoFrameCallback(frame);
-     };
+
+    const handleVideoFrame = (_: number, metadata: VideoFrameCallbackMetadata) => {
+      if (disposed) return;
+      drawFrame(metadata.mediaTime);
+      videoFrame = video.requestVideoFrameCallback(handleVideoFrame);
+    };
+
+    const fallbackTick = (now: number) => {
+      if (disposed) return;
+      if (now - lastFallbackDraw >= 33) {
+        lastFallbackDraw = now;
+        drawFrame(video.currentTime);
+      }
+      raf = requestAnimationFrame(fallbackTick);
+    };
+
+    void loadCaptionFonts().then(() => {
+      if (disposed) return;
+      drawFrame(video.currentTime);
+    });
+
+    if (typeof video.requestVideoFrameCallback === "function") {
+      videoFrame = video.requestVideoFrameCallback(handleVideoFrame);
+      video.addEventListener("timeupdate", () => drawFrame(video.currentTime));
+      video.addEventListener("seeked", () => drawFrame(video.currentTime));
+      video.addEventListener("pause", () => drawFrame(video.currentTime));
+    } else {
+      raf = requestAnimationFrame(fallbackTick);
+    }
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(raf);
+      if (videoFrame && typeof video.cancelVideoFrameCallback === "function") {
+        video.cancelVideoFrameCallback(videoFrame);
+      }
+    };
   }, [onTime]);
 
   return (
