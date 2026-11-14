@@ -109,117 +109,190 @@ function Index() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-8 md:py-12">
-      <header className="mb-10 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight md:text-6xl">
-            legenda<span className="text-primary">.</span>
-          </h1>
-          <p className="mt-2 max-w-md text-muted-foreground">Legendas palavra por palavra, sincronizadas e lindas, para os seus Reels.</p>
+    <main className="mx-auto min-h-screen max-w-[1440px] px-4 pb-16 pt-5 sm:px-6 lg:px-10">
+      <header className="mb-14 flex items-center justify-between border-b border-white/10 pb-5">
+        <a href="/" className="group flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-lg font-black text-primary-foreground shadow-glow">L.</div>
+          <div>
+            <div className="font-display text-lg font-extrabold tracking-tight">legenda<span className="text-primary">.</span></div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Creator studio</div>
+          </div>
+        </a>
+        <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-xs text-muted-foreground sm:flex">
+          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_var(--primary)]" />
+          Seu estúdio de legendas
         </div>
         {phase === "ready" && (
-          <Button variant="ghost" onClick={reset}>
-            <RotateCcw /> Novo vídeo
+          <Button variant="outline" className="rounded-full border-white/15 bg-white/[0.04]" onClick={reset}>
+            <RotateCcw /> Novo projeto
           </Button>
         )}
       </header>
 
+      <section className="mb-10 max-w-3xl">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Legendas que prendem atenção
+        </div>
+        <h1 className="font-display text-4xl font-extrabold leading-[1.04] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
+          Dê voz às suas ideias.<br /><span className="text-primary">Destaque cada palavra.</span>
+        </h1>
+        <p className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
+          Transforme seus vídeos em conteúdo pronto para publicar. Transcrição automática, legendas sincronizadas e estilos que valorizam sua mensagem.
+        </p>
+      </section>
+
+      <div className="mb-8 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-3">
+        {[
+          { n: "01", label: "Envie seu vídeo", active: phase === "idle" || phase === "error" },
+          { n: "02", label: "Personalize", active: phase === "ready" },
+          { n: "03", label: "Exporte", active: exporting !== null },
+        ].map((step) => (
+          <div key={step.n} className={cn("flex items-center gap-2 rounded-xl border px-3 py-3 transition", step.active ? "border-primary/35 bg-primary/[0.07]" : "border-white/[0.07] bg-white/[0.02]")}>
+            <span className={cn("font-mono text-xs font-bold", step.active ? "text-primary" : "text-muted-foreground/60")}>{step.n}</span>
+            <span className={cn("text-[10px] font-bold sm:text-xs", step.active ? "text-foreground" : "text-muted-foreground/60")}>{step.label}</span>
+          </div>
+        ))}
+      </div>
+
       {(phase === "idle" || phase === "error") && (
-        <Dropzone onFile={handleFile} error={phase === "error" ? error : ""} />
+        <div className="rounded-[2rem] border border-white/10 bg-white/[0.025] p-3 shadow-2xl sm:p-5">
+          <Dropzone onFile={handleFile} error={phase === "error" ? error : ""} />
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-2 pb-3 pt-5 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-primary" /> MP4 e MOV</span>
+            <span>Até 10 minutos</span>
+            <span>Transcrição automática</span>
+            <span>Exportação em vídeo</span>
+          </div>
+        </div>
       )}
 
       {phase === "transcribing" && (
-        <div className="grid place-items-center gap-6 py-20 text-center">
-          <div className="font-display text-5xl font-extrabold text-primary animate-caption-pulse md:text-7xl">OUVINDO…</div>
-          <p className="text-muted-foreground">Transcrevendo e sincronizando cada palavra. Leva alguns segundos.</p>
+        <div className="grid min-h-[420px] place-items-center rounded-[2rem] border border-white/10 bg-white/[0.025] px-6 py-16 text-center">
+          <div className="max-w-md">
+            <div className="mx-auto mb-7 grid h-20 w-20 place-items-center rounded-3xl border border-primary/25 bg-primary/10 text-primary shadow-glow">
+              <Loader2 className="h-9 w-9 animate-spin" />
+            </div>
+            <div className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Estamos ouvindo<span className="text-primary">.</span></div>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">Detectando a fala e sincronizando cada palavra do seu vídeo. Você poderá revisar tudo antes de exportar.</p>
+            <div className="mx-auto mt-8 h-1.5 max-w-xs overflow-hidden rounded-full bg-white/10"><div className="h-full w-1/2 animate-pulse rounded-full bg-primary" /></div>
+          </div>
         </div>
       )}
 
       {phase === "ready" && (
-        <div className="grid gap-10 md:grid-cols-[minmax(0,380px)_1fr]">
-          <Preview url={url} chunks={chunks} style={style} posY={posY} scale={scale} onTime={setNow} />
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(300px,0.82fr)_minmax(0,1.35fr)]">
+          <div className="space-y-4 xl:sticky xl:top-6">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">Pré-visualização</div>
+                <div className="mt-1 text-sm font-semibold">Veja as legendas em ação</div>
+              </div>
+              <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary">AO VIVO</span>
+            </div>
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-3 sm:p-4">
+              <Preview url={url} chunks={chunks} style={style} posY={posY} scale={scale} onTime={setNow} />
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-muted-foreground">PROJETO ATUAL</span>
+                <span className="text-primary">Pronto para editar</span>
+              </div>
+              <p className="mt-2 truncate text-sm font-semibold">{file?.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{chunks.length} blocos de legenda · {words.length} palavras detectadas</p>
+            </div>
+          </div>
 
-          <section className="space-y-8">
-            <div>
-              <Label>Estilo</Label>
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+          <section className="space-y-5">
+            <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">01 / Aparência</div>
+                  <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Escolha seu estilo</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Uma identidade visual para cada tipo de conteúdo.</p>
+                </div>
+                <span className="rounded-lg bg-primary/10 px-2.5 py-1.5 text-[10px] font-bold text-primary">5 PRESETS</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setStyleId(s.id)}
-                    className={cn(
-                      "rounded-xl border bg-card px-3 py-4 text-center transition",
-                      s.id === styleId ? "border-primary shadow-glow" : "hover:border-muted-foreground",
-                    )}
-                  >
-                    <div
-                      className="text-xl leading-none"
-                      style={{ fontFamily: s.font, fontWeight: s.weight, fontStyle: s.italic ? "italic" : "normal", textTransform: s.upper ? "uppercase" : "none" }}
-                    >
-                      Aa
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">{s.name}</div>
+                  <button key={s.id} onClick={() => setStyleId(s.id)} className={cn("group rounded-xl border px-3 py-4 text-center transition-all", s.id === styleId ? "border-primary/70 bg-primary/[0.09] shadow-glow" : "border-white/[0.08] bg-black/10 hover:border-white/25 hover:bg-white/[0.04]")}>
+                    <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-black/30 text-2xl" style={{ color: s.active, fontFamily: s.font, fontWeight: s.weight, fontStyle: s.italic ? "italic" : "normal", textTransform: s.upper ? "uppercase" : "none", textShadow: "0 2px 10px #000" }}>Aa</div>
+                    <div className="mt-3 text-xs font-bold">{s.name}</div>
+                    <div className={cn("mt-1 text-[9px]", s.id === styleId ? "text-primary" : "text-muted-foreground")}>{s.id === styleId ? "Selecionado" : "Aplicar estilo"}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-3">
-              <Control label="Palavras por vez" value={String(maxWords)}>
-                <Slider min={1} max={6} step={1} value={[maxWords]} onValueChange={(v) => setMaxWords(v[0] ?? 3)} />
-              </Control>
-              <Control label="Posição" value={`${Math.round(posY * 100)}%`}>
-                <Slider min={0.15} max={0.88} step={0.01} value={[posY]} onValueChange={(v) => setPosY(v[0] ?? 0.68)} />
-              </Control>
-              <Control label="Tamanho" value={`${Math.round(scale * 100)}%`}>
-                <Slider min={0.6} max={1.6} step={0.05} value={[scale]} onValueChange={(v) => setScale(v[0] ?? 1)} />
-              </Control>
+            <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
+              <div className="mb-6">
+                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">02 / Ajustes</div>
+                <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Refine sua legenda</h2>
+              </div>
+              <div className="grid gap-7 sm:grid-cols-3">
+                <Control label="Palavras por vez" value={String(maxWords)}>
+                  <Slider min={1} max={6} step={1} value={[maxWords]} onValueChange={(v) => setMaxWords(v[0] ?? 3)} />
+                </Control>
+                <Control label="Altura na tela" value={`${Math.round(posY * 100)}%`}>
+                  <Slider min={0.15} max={0.88} step={0.01} value={[posY]} onValueChange={(v) => setPosY(v[0] ?? 0.68)} />
+                </Control>
+                <Control label="Escala do texto" value={`${Math.round(scale * 100)}%`}>
+                  <Slider min={0.6} max={1.6} step={0.05} value={[scale]} onValueChange={(v) => setScale(v[0] ?? 1)} />
+                </Control>
+              </div>
             </div>
 
-            <div>
-              <Label>Texto ({chunks.length} legendas) — clique para corrigir</Label>
-              <div className="max-h-80 space-y-1.5 overflow-y-auto pr-2">
+            <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">03 / Revisão</div>
+                  <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Texto transcrito</h2>
+                </div>
+                <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-bold text-muted-foreground">{chunks.length} LEGENDAS</span>
+              </div>
+              <p className="mb-4 text-xs text-muted-foreground">Clique em qualquer linha para corrigir o texto. As marcações de tempo serão preservadas.</p>
+              <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
                 {chunks.map((c, i) => (
-                  <div
-                    key={c.id + c.words.map((w) => w.text).join()}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg border border-transparent px-3 py-2",
-                      now >= c.start && now < c.end ? "border-primary/50 bg-secondary" : "bg-card",
-                    )}
-                  >
-                    <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{c.start.toFixed(1)}s</span>
-                    <input
-                      defaultValue={c.words.map((w) => w.text).join(" ")}
-                      onBlur={(e) => e.target.value !== c.words.map((w) => w.text).join(" ") && editChunk(i, e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                      className="w-full bg-transparent text-sm outline-none"
-                    />
+                  <div key={c.id + c.words.map((w) => w.text).join()} className={cn("flex items-center gap-3 rounded-xl border px-3 py-3 transition", now >= c.start && now < c.end ? "border-primary/35 bg-primary/[0.07]" : "border-white/[0.045] bg-black/10 hover:border-white/10")}>
+                    <span className="w-12 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{c.start.toFixed(1)}s</span>
+                    <input defaultValue={c.words.map((w) => w.text).join(" ")} onBlur={(e) => e.target.value !== c.words.map((w) => w.text).join(" ") && editChunk(i, e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground focus:text-primary" />
+                    <span className="text-[10px] text-muted-foreground/50">↵</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="rounded-[1.75rem] border border-primary/25 bg-primary/[0.055] p-5 sm:p-6">
+              <div className="mb-4">
+                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">04 / Finalização</div>
+                <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Seu vídeo está quase pronto.</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Exporte o vídeo com as legendas aplicadas ou baixe o arquivo SRT.</p>
+              </div>
               {exporting !== null ? (
-                <div className="space-y-2">
-                  <Progress value={exporting * 100} />
-                  <p className="text-sm text-muted-foreground">Gravando o vídeo com legendas… {Math.round(exporting * 100)}% (mantenha esta aba aberta)</p>
+                <div className="space-y-3">
+                  <Progress value={exporting * 100} className="h-2 bg-primary/15" />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Renderizando vídeo… mantenha esta aba aberta.</span><strong className="text-primary">{Math.round(exporting * 100)}%</strong></div>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-3">
-                  <Button size="lg" onClick={exportVideo} className="font-bold">
-                    <Download /> Baixar vídeo legendado
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button size="lg" onClick={exportVideo} className="h-12 flex-1 rounded-xl font-extrabold shadow-glow">
+                    <Download /> Exportar vídeo
                   </Button>
-                  <Button size="lg" variant="secondary" onClick={() => download(new Blob([toSrt(chunks)], { type: "text/plain" }), "legendas.srt")}>
-                    <FileText /> Baixar .SRT
+                  <Button size="lg" variant="outline" onClick={() => download(new Blob([toSrt(chunks)], { type: "text/plain" }), "legendas.srt")} className="h-12 rounded-xl border-white/15 bg-white/[0.04]">
+                    <FileText /> Baixar SRT
                   </Button>
                 </div>
               )}
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
             </div>
           </section>
         </div>
       )}
+
+      <footer className="mt-16 flex flex-col items-center justify-between gap-3 border-t border-white/[0.08] pt-6 text-center text-[10px] text-muted-foreground sm:flex-row sm:text-left">
+        <span className="font-display text-sm font-extrabold tracking-tight text-foreground">legenda<span className="text-primary">.</span></span>
+        <span>Feito para criadores que têm algo a dizer.</span>
+        <span>LEGENDA STUDIO · 2026</span>
+      </footer>
     </main>
   );
 }
