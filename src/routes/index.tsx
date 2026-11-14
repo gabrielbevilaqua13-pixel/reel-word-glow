@@ -432,7 +432,7 @@ function Preview({
     let raf = 0;
     let videoFrame = 0;
     let lastFallbackDraw = 0;
-    let lastReportedTime = -1;
+    let lastActiveChunk = -2;
     let disposed = false;
 
     const drawFrame = (time: number) => {
@@ -454,8 +454,11 @@ function Preview({
       const s = state.current;
       drawCaptions(ctx, width, height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
 
-      if (Math.abs(time - lastReportedTime) > 0.1) {
-        lastReportedTime = time;
+      // Update the editor only when the active caption changes, not every 100 ms.
+      // This prevents the entire transcript/editor UI from re-rendering during playback.
+      const activeChunk = s.chunks.findIndex((chunk) => time >= chunk.start && time < chunk.end);
+      if (activeChunk !== lastActiveChunk) {
+        lastActiveChunk = activeChunk;
         onTime(time);
       }
     };
