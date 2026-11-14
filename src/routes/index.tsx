@@ -35,6 +35,10 @@ function Index() {
   const [url, setUrl] = useState("");
   const [words, setWords] = useState<Word[]>([]);
   const [styleId, setStyleId] = useState("impacto");
+  const [textColor, setTextColor] = useState("#ffffff");
+  const [highlightColor, setHighlightColor] = useState("#e4ff3a");
+  const [boxColor, setBoxColor] = useState("#ff4d2e");
+  const [showHighlightBox, setShowHighlightBox] = useState(false);
   const [maxWords, setMaxWords] = useState(3);
   const [posY, setPosY] = useState(0.68);
   const [scale, setScale] = useState(1);
@@ -47,7 +51,14 @@ function Index() {
     };
   }, [url]);
 
-  const style = STYLES.find((s) => s.id === styleId) ?? STYLES[0]!;
+  const baseStyle = STYLES.find((s) => s.id === styleId) ?? STYLES[0]!;
+  const style = useMemo(() => ({ ...baseStyle, fill: textColor, active: highlightColor, accent: baseStyle.accent ? highlightColor : baseStyle.accent, box: showHighlightBox ? boxColor : baseStyle.box, boxText: textColor }), [baseStyle, textColor, highlightColor, boxColor, showHighlightBox]);
+  useEffect(() => {
+    setTextColor(baseStyle.fill);
+    setHighlightColor(baseStyle.accent ?? baseStyle.active);
+    setBoxColor(baseStyle.box ?? "#ff4d2e");
+    setShowHighlightBox(Boolean(baseStyle.box));
+  }, [styleId]);
   const chunks = useMemo(() => groupWords(words, maxWords), [words, maxWords]);
 
   const handleFile = async (f: File) => {
@@ -249,9 +260,37 @@ function Index() {
             </div>
 
             <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
+              <div className="mb-5">
+                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">03 / Identidade visual</div>
+                <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Suas cores, sua marca</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Personalize o texto e a palavra em destaque. As mudanças aparecem na prévia e na exportação.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <ColorControl label="Texto" value={textColor} onChange={setTextColor} />
+                <ColorControl label="Destaque" value={highlightColor} onChange={setHighlightColor} />
+                <ColorControl label="Fundo do destaque" value={boxColor} onChange={setBoxColor} />
+              </div>
+              <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm text-muted-foreground">
+                <input type="checkbox" checked={showHighlightBox} onChange={(e) => setShowHighlightBox(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
+                Aplicar fundo colorido à palavra ativa
+              </label>
+              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-4">
+                <span className="mr-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Combinações rápidas</span>
+                {[
+                  { name: "Clássico", text: "#ffffff", highlight: "#e4ff3a", box: "#ff4d2e", enabled: false },
+                  { name: "Editorial", text: "#f4ead8", highlight: "#d5ad72", box: "#34271f", enabled: false },
+                  { name: "Monocromático", text: "#ffffff", highlight: "#bdbdbd", box: "#ffffff", enabled: true },
+                  { name: "Noite", text: "#f8fafc", highlight: "#7dd3fc", box: "#075985", enabled: true },
+                ].map((preset) => (
+                  <button key={preset.name} onClick={() => { setTextColor(preset.text); setHighlightColor(preset.highlight); setBoxColor(preset.box); setShowHighlightBox(preset.enabled); }} className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-bold text-muted-foreground transition hover:border-primary/50 hover:text-foreground">{preset.name}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">03 / Revisão</div>
+                  <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">04 / Revisão</div>
                   <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Texto transcrito</h2>
                 </div>
                 <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-bold text-muted-foreground">{chunks.length} LEGENDAS</span>
@@ -270,7 +309,7 @@ function Index() {
 
             <div className="rounded-[1.75rem] border border-primary/25 bg-primary/[0.055] p-5 sm:p-6">
               <div className="mb-4">
-                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">04 / Finalização</div>
+                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">05 / Finalização</div>
                 <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight">Seu vídeo está quase pronto.</h2>
                 <p className="mt-1 text-xs text-muted-foreground">Exporte o vídeo com as legendas aplicadas ou baixe o arquivo SRT.</p>
               </div>
@@ -317,6 +356,18 @@ function Control({ label, value, children }: { label: string; value: string; chi
       </div>
       {children}
     </div>
+  );
+}
+
+function ColorControl({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-3">
+      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className="h-10 w-12 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
+      <span className="min-w-0">
+        <span className="block text-xs font-bold text-foreground">{label}</span>
+        <span className="mt-1 block font-mono text-[10px] uppercase text-muted-foreground">{value}</span>
+      </span>
+    </label>
   );
 }
 
