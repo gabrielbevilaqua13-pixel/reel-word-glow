@@ -18,8 +18,8 @@ export const transcribeAudio = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z
       .object({
-        audioBase64: z.string().min(100).max(20_000_000),
-        duration: z.number().positive().max(600),
+        audioBase64: z.string().min(60).max(1_000_000).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+        duration: z.number().positive().max(12),
       })
       .parse(d),
   )
@@ -32,6 +32,10 @@ export const transcribeAudio = createServerFn({ method: "POST" })
 
     try {
       const audioBytes = Buffer.from(data.audioBase64, "base64");
+      const maxAudioBytes = Math.ceil(data.duration * 16_000 * 2) + 44;
+      if (audioBytes.byteLength < 44 || audioBytes.byteLength > maxAudioBytes) {
+        return { error: "O trecho de áudio enviado é inválido. Tente enviar o vídeo novamente." };
+      }
       const form = new FormData();
       form.append("file", new Blob([audioBytes], { type: "audio/wav" }), "audio.wav");
       form.append("model", "whisper-large-v3");
