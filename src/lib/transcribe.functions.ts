@@ -1,8 +1,42 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { normalizeWords } from "./timing";
 
 export type Word = { text: string; start: number; end: number };
+
+// First-line abuse protection for the single-instance Render deployment.
+// Counters are intentionally in-memory: they reset on restart and are not a
+// substitute for a shared store when the service scales to multiple instances.
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+const DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_REQUESTS_PER_HOUR = 150;
+const MAX_REQUESTS_PER_DAY = 400;
+const requestHistory = new Map<string, number[]>();
+
+function checkTranscriptionLimit(ip: string): { allowed: boolean; retryAfterSeconds: number } {
+  const now = Date.now();
+  const history = (requestHistory.get(ip) ?? []).filter((time) => now - time < DAILY_WINDOW_MS);
+  const hourly = history.filter((time) => now - time < RATE_WINDOW_MS);
+  if (hourly.length >= MAX_REQUESTS_PER_HOUR) {
+    requestHistory.set(ip, history);
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((hourly[0]! + RATE_WINDOW_MS - now) / 1000)) };
+  }
+  if (history.length >= MAX_REQUESTS_PER_DAY) {
+    requestHistory.set(ip, history);
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((history[0]! + DAILY_WINDOW_MS - now) / 1000)) };
+  }
+  history.push(now);
+  requestHistory.set(ip, history);
+
+  // Keep memory bounded if many distinct IPs contact the endpoint.
+  if (requestHistory.size > 5_000) {
+    for (const [key, times] of requestHistory) {
+      if (!times.some((time) => now - time < DAILY_WINDOW_MS)) requestHistory.delete(key);
+    }
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
+}
 
 const groqResponseSchema = z.object({
   words: z.array(
@@ -24,6 +58,13 @@ export const transcribeAudio = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }): Promise<{ words: Word[] } | { error: string }> => {
+    const ip = getRequestIP({ xForwardedFor: true }) ?? "unknown";
+    const limit = checkTranscriptionLimit(ip);
+    if (!limit.allowed) {
+      console.warn("Transcription rate limit reached", { ip });
+      return { error: "Você atingiu o limite temporário de transcrições. Aguarde um pouco e tente novamente." };
+    }
+
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.error("Transcription configuration error: GROQ_API_KEY is missing");
