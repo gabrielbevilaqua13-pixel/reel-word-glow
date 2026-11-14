@@ -41,12 +41,17 @@ function Index() {
   const [exporting, setExporting] = useState<number | null>(null);
   const [now, setNow] = useState(0);
 
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [url]);
+
   const style = STYLES.find((s) => s.id === styleId) ?? STYLES[0]!;
   const chunks = useMemo(() => groupWords(words, maxWords), [words, maxWords]);
 
   const handleFile = async (f: File) => {
     if (!f.type.startsWith("video/")) return setError("Envie um arquivo de vídeo."), setPhase("error");
-    if (url) URL.revokeObjectURL(url);
     setFile(f);
     setUrl(URL.createObjectURL(f));
     setPhase("transcribing");
@@ -84,6 +89,8 @@ function Index() {
     setPhase("idle");
     setWords([]);
     setFile(null);
+    setUrl("");
+    setError("");
   };
 
   const exportVideo = async () => {
