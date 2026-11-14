@@ -326,17 +326,22 @@ function Dropzone({ onFile, error }: { onFile: (f: File) => void; error: string 
         if (f) onFile(f);
       }}
       className={cn(
-        "flex cursor-pointer flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed px-6 py-24 text-center transition",
-        over ? "border-primary bg-secondary" : "border-border hover:border-muted-foreground",
+        "group relative flex min-h-[340px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.6rem] border border-dashed px-6 py-14 text-center transition-all sm:min-h-[390px]",
+        over ? "border-primary bg-primary/[0.09] shadow-glow" : "border-white/15 bg-black/10 hover:border-primary/50 hover:bg-primary/[0.035]",
       )}
     >
-      <div className="grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-foreground">
-        <Upload />
+      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={{ backgroundImage: "radial-gradient(circle at 50% 45%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 48%)" }} />
+      <div className={cn("relative mb-6 grid h-20 w-20 place-items-center rounded-[1.6rem] border transition-all duration-300", over ? "scale-105 border-primary bg-primary text-primary-foreground shadow-glow" : "border-primary/25 bg-primary/10 text-primary group-hover:-translate-y-1 group-hover:border-primary/50 group-hover:shadow-glow")}>
+        <Upload className="h-8 w-8" />
       </div>
-      <div className="font-display text-2xl font-extrabold">Solte seu Reel aqui</div>
-      <p className="text-sm text-muted-foreground">MP4 ou MOV, vertical 9:16. A fala é detectada automaticamente.</p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <input type="file" accept="video/*" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+      <div className="relative font-display text-2xl font-extrabold tracking-tight sm:text-3xl">{over ? "Solte para começar" : "Arraste seu vídeo para cá"}</div>
+      <p className="relative mt-3 max-w-sm text-sm leading-6 text-muted-foreground">ou clique para selecionar um arquivo no seu dispositivo. A transcrição e a sincronização acontecem automaticamente.</p>
+      <span className="relative mt-7 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-xs font-extrabold text-primary-foreground shadow-glow transition-transform group-hover:scale-[1.03]">Selecionar vídeo <Upload className="h-3.5 w-3.5" /></span>
+      <div className="relative mt-7 flex flex-wrap justify-center gap-2">
+        {["MP4", "MOV", "Até 10 minutos"].map((item) => <span key={item} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[10px] font-bold tracking-wide text-muted-foreground">{item}</span>)}
+      </div>
+      {error && <p className="relative mt-5 rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>}
+      <input type="file" accept="video/mp4,video/quicktime,video/*" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
     </label>
   );
 }
