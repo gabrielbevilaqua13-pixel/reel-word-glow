@@ -43,7 +43,6 @@ function Index() {
   const [posY, setPosY] = useState(0.68);
   const [scale, setScale] = useState(1);
   const [exporting, setExporting] = useState<number | null>(null);
-  const [now, setNow] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -208,7 +207,7 @@ function Index() {
               <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary">AO VIVO</span>
             </div>
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-3 sm:p-4">
-              <Preview url={url} chunks={chunks} style={style} posY={posY} scale={scale} onTime={setNow} />
+              <Preview url={url} chunks={chunks} style={style} posY={posY} scale={scale} />
             </div>
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
               <div className="flex items-center justify-between text-xs">
@@ -410,14 +409,12 @@ function Preview({
   style,
   posY,
   scale,
-  onTime,
 }: {
   url: string;
   chunks: ReturnType<typeof groupWords>;
   style: (typeof STYLES)[number];
   posY: number;
   scale: number;
-  onTime: (t: number) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -470,15 +467,12 @@ function Preview({
       ctx.clearRect(0, 0, width, height);
       drawCaptions(ctx, width, height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
 
-      const chunkChanged = activeChunk !== lastActiveChunk;
       lastActiveChunk = activeChunk;
       lastActiveWord = activeWord;
       lastStyle = s.style;
       lastPosY = s.posY;
       lastScale = s.scale;
 
-      // The transcript panel only needs to update when the active caption changes.
-      if (chunkChanged) onTime(time);
     };
 
     const handleVideoFrame = (_: number, metadata: VideoFrameCallbackMetadata) => {
@@ -517,7 +511,7 @@ function Preview({
         video.cancelVideoFrameCallback(videoFrame);
       }
     };
-  }, [onTime]);
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-[380px]">
