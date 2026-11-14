@@ -433,16 +433,33 @@ function Preview({
     let videoFrame = 0;
     let lastFallbackDraw = 0;
     let lastActiveChunk = -2;
+    let lastActiveWord = -2;
+    let lastStyle: typeof style | null = null;
+    let lastPosY = -1;
+    let lastScale = -1;
     let disposed = false;
 
     const drawFrame = (time: number) => {
       if (disposed || !video.videoWidth) return;
+      const s = state.current;
+      const activeChunk = s.chunks.findIndex((chunk) => time >= chunk.start && time < chunk.end);
+      const chunk = activeChunk >= 0 ? s.chunks[activeChunk] : undefined;
+      const activeWord = chunk?.words.findIndex((word) => time >= word.start && time < word.end) ?? -1;
+      const chunkAge = chunk ? time - chunk.start : Infinity;
+      const wordAge = activeWord >= 0 && chunk ? time - chunk.words[activeWord]!.start : Infinity;
+      const settingsChanged = s.style !== lastStyle || s.posY !== lastPosY || s.scale !== lastScale;
+      const captionChanged = activeChunk !== lastActiveChunk || activeWord !== lastActiveWord;
+      // The video is a native video layer. The canvas only needs repainting when
+      // the spoken word/style changes, plus the brief 120 ms entrance animation.
+      const entranceAnimating = chunkAge >= 0 && chunkAge < 0.14 ||
+        (s.style.reveal && wordAge >= 0 && wordAge < 0.14);
+      if (!settingsChanged && !captionChanged && !entranceAnimating) return;
+
       // Keep the preview canvas lightweight even when the source is 4K.
       const maxDimension = 720;
       const ratio = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
       const width = Math.max(1, Math.round(video.videoWidth * ratio));
       const height = Math.max(1, Math.round(video.videoHeight * ratio));
-
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
@@ -451,16 +468,17 @@ function Preview({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
-      const s = state.current;
       drawCaptions(ctx, width, height, s.chunks, time, s.style, { posY: s.posY, scale: s.scale });
 
-      // Update the editor only when the active caption changes, not every 100 ms.
-      // This prevents the entire transcript/editor UI from re-rendering during playback.
-      const activeChunk = s.chunks.findIndex((chunk) => time >= chunk.start && time < chunk.end);
-      if (activeChunk !== lastActiveChunk) {
-        lastActiveChunk = activeChunk;
-        onTime(time);
-      }
+      const chunkChanged = activeChunk !== lastActiveChunk;
+      lastActiveChunk = activeChunk;
+      lastActiveWord = activeWord;
+      lastStyle = s.style;
+      lastPosY = s.posY;
+      lastScale = s.scale;
+
+      // The transcript panel only needs to update when the active caption changes.
+      if (chunkChanged) onTime(time);
     };
 
     const handleVideoFrame = (_: number, metadata: VideoFrameCallbackMetadata) => {
